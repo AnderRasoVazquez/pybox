@@ -1,11 +1,11 @@
 import requests
 import json
+import os.path
 
 from cmd import Cmd
 
 from .metadata import File
 
-import os.path
 
 FORECOLORS = {
     "black": '\x1b[30m',
@@ -39,6 +39,7 @@ LS_FILE = FORECOLORS['none'] + BACKCOLORS['none']
 DOLLAR = FORECOLORS['bold'] + FORECOLORS['green'] + BACKCOLORS['none']
 BRACKETS = FORECOLORS['bold'] + FORECOLORS['red'] + BACKCOLORS['none']
 PATH = FORECOLORS['bold'] + FORECOLORS['cyan'] + BACKCOLORS['none']
+
 
 class DropboxClient(object, Cmd):
     """Cliente para comunicarse con Dropbox."""
@@ -105,24 +106,6 @@ class DropboxClient(object, Cmd):
     def _empty_tree(self):
         self.files = []
 
-    def _select_item(self, item_number):
-        """Elegir el elemento de la lista."""
-        # TODO hacer comprobaciones de que el numero es correcto
-        if 0 <= item_number < len(self.files):
-            if item_number == 0:
-                self._go_back()
-            else:
-                item_number -= 1
-                item = self.files[item_number]
-                if item.is_folder():
-                    item_path = item.get_full_path()
-                    self.current_folder = item_path
-                    self._update_tree(item_path)
-                else:
-                    print "is file, todavia sin implementar"
-        else:
-            print "Not valid number, try again."
-
     def _show_interface(self):
         index = 0
         for element in self.files:
@@ -131,16 +114,6 @@ class DropboxClient(object, Cmd):
                 print LS_FOLDER + str(element) + RESETSTYLE
             else:
                 print str(element)
-
-    def run(self):
-        while True:
-            self._show_interface()
-            option = raw_input("\nInsert number and press ENTER ('q' to quit):\n")
-            # TODO repetir hasta que sea correcto el numero o q
-            print "\n\n\n\n"
-            if option == "q":
-                exit()
-            self._select_item(int(option))
 
     def _get_completions(self, text):
         return [i.name for i in self.files if i.name.startswith(text)]
@@ -202,8 +175,52 @@ class DropboxClient(object, Cmd):
     def complete_share(self, text, line, begidx, endidx):
         return self._get_completions(text)
 
+    def download_file(self, file_path):
+        headers = {
+            "Authorization": "Bearer " + self.token,
+            "Dropbox-API-Arg": '{"path": ' + '"' + file_path + '"' + '}'
+        }
+
+        response = requests.post('https://content.dropboxapi.com/2/files/download', headers=headers)
+
+        if response.status_code == 200:
+            filename = file_path.split('/')[-1]
+            open(filename, 'wb').write(response.content)
+            print "Descargado: '" + filename + "'"
+        else:
+            raise Exception("Download didn't return any result.")
+
+    def download_folder(self, file_path):
+        headers = {
+            "Authorization": "Bearer " + self.token,
+            "Dropbox-API-Arg": '{"path": ' + '"' + file_path + '"' + '}'
+        }
+
+        response = requests.post('https://content.dropboxapi.com/2/files/download_zip', headers=headers)
+
+        if response.status_code == 200:
+            filename = file_path.split('/')[-1]
+            filename += ".zip"
+            open(filename, 'wb').write(response.content)
+            print "Descargado: '" + filename + "'"
+        else:
+            raise Exception("Download didn't return any result.")
+
     def do_download(self, arg):
-        print "Descargar un archivo o carpeta", arg
+        file_found = False
+        for item in self.files:
+            if item.name == arg:
+                file_found = True
+                try:
+                    if item.is_folder():
+                        self.download_folder(self.current_folder + arg)
+                    else:
+                        self.download_file(self.current_folder + arg)
+                except:
+                    print "Error al intentar descargar el archivo."
+                break
+        if not file_found:
+            print "El archivo a descargar no existe.."
 
     def help_download(self):
         print "Descargar un archivo o carpeta."

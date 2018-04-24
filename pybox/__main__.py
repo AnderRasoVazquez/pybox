@@ -15,9 +15,15 @@
 from .client import DropboxClient
 
 
-client = DropboxClient()
+def main():
+    client = DropboxClient()
+    client.cmdloop()
 
 
-client.run()
-
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print '\nPrograma interrumpido.'
+        exit(1)
 

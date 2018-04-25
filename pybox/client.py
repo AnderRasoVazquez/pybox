@@ -1,9 +1,11 @@
+# -*- coding: utf-8 -*-
+
 import requests
 import json
 import os.path
+
 from os import listdir
 from os.path import isfile, join
-
 from cmd import Cmd
 
 from .metadata import File
@@ -123,6 +125,9 @@ class DropboxClient(object, Cmd):
     def _get_completions(self, text):
         return [i.name for i in self.files if i.name.startswith(text)]
 
+    def _get_file_completions(self, text):
+        return [i.name for i in self.files if i.is_file() and i.name.startswith(text)]
+
     def do_ls(self, arg):
         self._show_interface()
 
@@ -199,14 +204,60 @@ class DropboxClient(object, Cmd):
     def complete_rm(self, text, line, begidx, endidx):
         return self._get_completions(text)
 
+    def _get_file_id(self, file_name):
+        for item in self.files:
+            if file_name == item.name:
+                return item.id
+        raise Exception("El archivo indicado no existe.")
+
+    def share_file(self, file_name, mail):
+        headers = {
+            "Authorization": "Bearer " + self.token,
+            "Content-Type": "application/json"
+        }
+
+        file_id = self._get_file_id(file_name)
+
+        data = {
+            "file": file_id,
+            "members": [
+                {
+                    ".tag": "email",
+                    "email": mail
+                }
+            ],
+            "access_level": "viewer",
+        }
+
+        response = requests.post('https://api.dropboxapi.com/2/sharing/add_file_member', headers=headers, json=data)
+
+        if response.status_code == 200:
+            print "Compartido: '" + self.current_folder + file_name + "'"
+        else:
+            print response
+            print response.content
+            raise Exception("Error while sharing file.")
+        pass
+
     def do_share(self, arg):
-        print "Compartir un archivo o carpeta", arg
+        file_found = False
+        for item in self.files:
+            if item.name == arg and item.is_file():
+                file_found = True
+                try:
+                    mail = raw_input("Share with: ")
+                    self.share_file(arg, mail)
+                except:
+                    print "Error al intentar compartir el archivo."
+                break
+        if not file_found:
+            print "El archivo a compartir no existe."
 
     def help_share(self):
-        print "Compartir un archivo o carpeta."
+        print "Compartir un archivo."
 
     def complete_share(self, text, line, begidx, endidx):
-        return self._get_completions(text)
+        return self._get_file_completions(text)
 
     def download_file(self, file_path):
         headers = {

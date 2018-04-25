@@ -1,6 +1,8 @@
 import requests
 import json
 import os.path
+from os import listdir
+from os.path import isfile, join
 
 from cmd import Cmd
 
@@ -115,6 +117,9 @@ class DropboxClient(object, Cmd):
             else:
                 print str(element)
 
+    def update_folder_content(self):
+        self._update_tree(self.current_folder)
+
     def _get_completions(self, text):
         return [i.name for i in self.files if i.name.startswith(text)]
 
@@ -148,7 +153,6 @@ class DropboxClient(object, Cmd):
 
     def complete_cd(self, text, line, begidx, endidx):
         return [i.name for i in self.files if i.is_folder() and i.name.startswith(text)]
-        # return [i for i in self.files if i.is_folder() and i.startswith(text)]
 
     def help_cd(self):
         print "Entra dentro de la carpeta indicada."
@@ -157,8 +161,37 @@ class DropboxClient(object, Cmd):
         print "self.current_folder " + self.current_folder
         print "self.folder " + self.folder
 
+    def rm(self, item_path):
+        headers = {
+            "Authorization": "Bearer " + self.token,
+            "Content-Type": "application/json"
+        }
+
+        data = {"path": item_path}
+
+        response = requests.post('https://api.dropboxapi.com/2/files/delete_v2', headers=headers, json=data)
+
+        if response.status_code == 200:
+            print "Eliminado: '" + item_path + "'"
+        else:
+            print response
+            print response.content
+            raise Exception("Remove didn't return any result.")
+        pass
+
     def do_rm(self, arg):
-        print "remove sin implementar a", arg
+        file_found = False
+        for item in self.files:
+            if item.name == arg:
+                file_found = True
+                try:
+                    self.rm(self.current_folder + arg)
+                    self.update_folder_content()
+                except:
+                    print "Error al intentar eliminar el archivo."
+                break
+        if not file_found:
+            print "El archivo a eliminar no existe.."
 
     def help_rm(self):
         print "Eliminar un archivo o carpeta."
@@ -193,7 +226,7 @@ class DropboxClient(object, Cmd):
     def download_folder(self, file_path):
         headers = {
             "Authorization": "Bearer " + self.token,
-            "Dropbox-API-Arg": '{"path": ' + '"' + file_path + '"' + '}'
+            "Dropbox-API-Arg": self._format_json([("path", file_path)])
         }
 
         response = requests.post('https://content.dropboxapi.com/2/files/download_zip', headers=headers)
@@ -228,14 +261,60 @@ class DropboxClient(object, Cmd):
     def complete_download(self, text, line, begidx, endidx):
         return self._get_completions(text)
 
+    def _format_json_key(self, key, value):
+        if value.lower() not in ["true", "false"]:
+            return '"%s": "%s"' % (key, value)
+        else:
+            return '"%s": %s' % (key, value)
+
+
+    def _format_json(self, the_list):
+        result = "{"
+        index = 0
+        size = len(the_list)
+        while index < size:
+            result += self._format_json_key(the_list[index][0], the_list[index][1])
+            if index != size - 1:
+                result += ", "
+            index += 1
+        result += "}"
+        return result
+
+    def upload(self, file_path):
+        headers = {
+            "Authorization": "Bearer " + self.token,
+            "Dropbox-API-Arg": self._format_json([("path", self.current_folder + file_path), ("mode", "add"), ("autorename", "true"), ("mute", "false")]),
+            "Content-Type": "application/octet-stream"
+        }
+
+        # - -data - binary @ local_file.txt
+        the_file = open(file_path, 'rb')
+        files = {'file': the_file}
+        try:
+            response = requests.post('https://content.dropboxapi.com/2/files/upload', headers=headers, files=files)
+        finally:
+            the_file.close()
+
+        if response.status_code == 200:
+            print "Subido: '" + file_path + "'"
+        else:
+            raise Exception("Error during download.")
+        pass
+
     def do_upload(self, arg):
-        print "Subir un archivo o carpeta", arg
+        mypath = os.getcwd()
+        if arg not in [f for f in listdir(mypath) if isfile(join(mypath, f))]:
+            print "Archivo '" + arg + "' no encontrado en la carpeta '" + mypath + "'."
+        else:
+            self.upload(arg)
+            self.update_folder_content()
 
     def help_upload(self):
-        print "Subir un archivo o carpeta."
+        print "Subir un archivo."
 
     def complete_upload(self, text, line, begidx, endidx):
-        return self._get_completions(text)
+        mypath = os.getcwd()
+        return [f for f in listdir(mypath) if isfile(join(mypath, f)) if f.startswith(text)]
 
     def do_color(self, arg):
         self.color = not self.color
@@ -253,4 +332,10 @@ class DropboxClient(object, Cmd):
     # Para manejar el atajo Ctrl-D
     do_EOF = do_exit
     help_EOF = help_exit
+
+    def do_update(self, arg):
+        self.update_folder_content()
+
+    def help_update(self):
+        print "Actualiza el contenido de la carpeta."
 

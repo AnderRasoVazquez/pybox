@@ -7,39 +7,45 @@ import urllib
 import webbrowser
 import json
 import requests
+import os.path
 
 
 class TokenManager(object):
     """Esta clase se encarga de descargar, guardar o mostrar el token."""
     def __init__(self):
         self.port = 8586
+        self.token_path = os.path.dirname(os.path.abspath(__file__)) + '/data/token'
+        self.client_id = "7veypz9j473hv46"
+        self.client_secret = '8frtxz74m0ur5uc'
+        self.token = self._get_token()
 
-    def get_code(self):
-        servidor = 'www.dropbox.com'
-        params = {'response_type': 'code',
-                  'client_id': "7veypz9j473hv46",
-                  # 'redirect_uri': 'http://localhost'}
-                  'redirect_uri': 'http://localhost:' + str(self.port)}
-        # 'redirect_uri': 'http://127.0.0.1:8586'}
+    def _get_code(self):
+        """Obtiene el codigo."""
+        server = 'www.dropbox.com'
+        params = {
+            'response_type': 'code',
+            'client_id': self.client_id,
+            'redirect_uri': 'http://localhost:' + str(self.port)
+        }
 
         params_encoded = urllib.urlencode(params)
-        recurso = '/1/oauth2/authorize?' + params_encoded
+        resource = '/1/oauth2/authorize?' + params_encoded
 
-        uri = 'https://' + servidor + recurso
-        print uri
+        uri = 'https://' + server + resource
         webbrowser.open_new(uri)
 
+        print 'Petición al usuario de Autenticación y Permiso...'
 
-        print '###############################################################################'
-        print 'Petición al usuario de Autenticación y Permiso: Devuelve el Code'
-        print '###############################################################################'
         listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listen_socket.bind(('localhost', self.port))
         listen_socket.listen(1)
+
         print 'Serving HTTP on port %s ...' % self.port
+
         client_connection, client_address = listen_socket.accept()
         request = client_connection.recv(1024)
+
         print "Conexion local Respuesta:"
         print request
 
@@ -54,28 +60,55 @@ class TokenManager(object):
         """
         client_connection.sendall(http_response)
         client_connection.close()
+
         code = request.split('\n')[0].split('?')[1].split('=')[1].split(' ')[0]
-        print "code:"+ code
+        return code
 
-    def get_token(self, code):
-        ######################################################################################
-        # ACCESS_TOKEN: Obtener el TOKEN
-        # https://www.api.dropboxapi.com/1/oauth2/token
-        #####################################################################################
-        parametros = {'code': code,
-                      'grant_type': 'authorization_code',
-                      'client_id': '7veypz9j473hv46',
-                      'client_secret': '8frtxz74m0ur5uc',
-                      'redirect_uri': 'http://localhost:' + str(self.port)}
+    def _obtain_token(self, code):
+        """Obtiene el token online."""
+        data = {
+            'code': code,
+            'grant_type': 'authorization_code',
+            'client_id': self.client_id,
+            'client_secret': self.client_secret,
+            'redirect_uri': 'http://localhost:' + str(self.port)
+        }
 
-        cabeceras = {'User-Agent':'Python Client',
-                     'Content-Type': 'application/x-www-form-urlencoded'}
+        headers = {
+            'User-Agent':'Python Client',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
 
-        respuesta = requests.post('https://api.dropboxapi.com/1/oauth2/token', headers=cabeceras,
-                                  data=parametros)
+        response = requests.post('https://api.dropboxapi.com/1/oauth2/token', headers=headers, data=data)
 
-        print respuesta.status_code
-        json_respuesta = json.loads(respuesta.content)
+        if response.status_code == 200:
+            return json.loads(response.content)["access_token"]
+        else:
+            print response
+            print response.content
+            raise Exception("Couldn't retrieve access token.")
 
-        access_token = json_respuesta['access_token']
-        print "Access_Token:" + access_token
+    def _save_token(self, token):
+        """Guarda el token."""
+        path = os.path.dirname(os.path.abspath(__file__)) + '/data/token'
+        with open(path, 'w') as f:
+            f.write(token)
+
+    def _get_token(self):
+        """Obtiene el token."""
+        saved_token = self._read_token()
+        if saved_token:
+            return saved_token
+        else:
+            code = self._get_code()
+            token = self._obtain_token(code)
+            self._save_token(token)
+            return token
+
+    def _read_token(self):
+        """Lee el token guardado."""
+        if os.path.isfile(self.token_path):
+            with open(self.token_path, 'r') as f:
+                return f.read()
+        return None
+

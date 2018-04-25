@@ -6,13 +6,14 @@ import json
 import os.path
 
 from .utils import format_json
+from.token_manager import TokenManager
 
 
 class DropboxClient(object):
     """Esta clase representa un cliente de dropbox."""
     def __init__(self):
-        # TODO get token
-        self.token = "4PUJzfSzG6AAAAAAAAABnBKIkgGOIkS88n9OP9TnJGLMtR0R4Xl3mYrHvI1FWqaD"
+        self.token_manager = TokenManager()
+        self.token = self.token_manager.token
 
     def get_tree(self, folder=""):
         """Devuelve un diccionario con los contenidos de la carpeta."""

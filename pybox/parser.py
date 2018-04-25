@@ -33,8 +33,8 @@ class Parser(object):
 
         parser_upload = subparsers.add_parser('upload', help='Upload a file')
         parser_upload.add_argument('file_path',
-                                  type=str,
-                                  help='file path')
+                                   type=str,
+                                   help='file path')
         parser_upload.add_argument('destination',
                                    type=str,
                                    help='Dropbox folder destination.')
@@ -101,7 +101,6 @@ class Parser(object):
             exit(1)
 
     def share(self, args):
-        print args
         """Comparte un archivo."""
         try:
             self.client.share_file_by_path(args.file_path, args.email)

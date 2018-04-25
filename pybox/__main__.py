@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
+"""Este modulo se encarga de lanzar el programa."""
 
 # TODO ver si existe el token (configparser)
     # TODO si no existe coger y guardar el token
     # TODO si existe leer el token
     # TODO (maybe) multiplatform
 
-from .client import DropboxClient
+from .command_line import CmdInterpreter
 
 
 def main():
     """Funcion principal."""
-    client = DropboxClient()
+    client = CmdInterpreter()
     client.cmdloop()
 
 

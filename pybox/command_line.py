@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
+"""Este modulo se encarga de gestionar los comandos en un interprete de terminal."""
 
-import requests
-import json
 import os.path
 
 from os import listdir
@@ -9,6 +8,7 @@ from os.path import isfile, join
 from cmd import Cmd
 
 from .metadata import File
+from .dropbox_client import DropboxClient
 
 
 FORECOLORS = {
@@ -45,16 +45,16 @@ BRACKETS = FORECOLORS['bold'] + FORECOLORS['red'] + BACKCOLORS['none']
 PATH = FORECOLORS['bold'] + FORECOLORS['cyan'] + BACKCOLORS['none']
 
 
-class DropboxClient(object, Cmd):
+class CmdInterpreter(object, Cmd):
     """Cliente para comunicarse con Dropbox."""
 
     def __init__(self):
         # TODO conseguir el token
         Cmd.__init__(self)
-        self.token = "4PUJzfSzG6AAAAAAAAABnBKIkgGOIkS88n9OP9TnJGLMtR0R4Xl3mYrHvI1FWqaD"
+        self.client = DropboxClient("4PUJzfSzG6AAAAAAAAABnBKIkgGOIkS88n9OP9TnJGLMtR0R4Xl3mYrHvI1FWqaD")
         self.files = []
         self.folder = "/"
-        self._construct_tree(self._get_tree(self.folder))
+        self._construct_tree(self.client.get_tree(self.folder))
         self.prompt_intro = "dropbox:"
         self.prompt = ""
         self.current_folder = "/"
@@ -71,25 +71,6 @@ class DropboxClient(object, Cmd):
     def postcmd(self, stop, line):
         self._update_prompt()
 
-    def _get_tree(self, folder=""):
-        """Devuelve un diccionario con los contenidos de la carpeta."""
-        if folder == "/":
-            folder = ""
-
-        headers = {
-            "Authorization": "Bearer " + self.token,
-            "Content-Type": "application/json"
-        }
-
-        data = {"path": folder}
-
-        response = requests.post('https://api.dropboxapi.com/2/files/list_folder', headers=headers, json=data)
-
-        if response.status_code == 200:
-            return json.loads(response.content)
-        else:
-            raise Exception("Folder name didn't return any result.")
-
     def _construct_tree(self, tree):
         for item in tree["entries"]:
             the_file = File(item["id"], item[".tag"], item["name"],
@@ -98,12 +79,12 @@ class DropboxClient(object, Cmd):
 
     def _update_tree(self, folder):
         self._empty_tree()
-        self._construct_tree(self._get_tree(folder))
+        self._construct_tree(self.client.get_tree(folder))
         self.folder = os.path.dirname(os.path.dirname(folder))
 
     def _go_back(self):
         self._empty_tree()
-        self._construct_tree(self._get_tree(self.folder))
+        self._construct_tree(self.client.get_tree(self.folder))
         self.current_folder = self.folder
         self.folder = os.path.dirname(self.folder)
 
@@ -166,31 +147,13 @@ class DropboxClient(object, Cmd):
         print "self.current_folder " + self.current_folder
         print "self.folder " + self.folder
 
-    def rm(self, item_path):
-        headers = {
-            "Authorization": "Bearer " + self.token,
-            "Content-Type": "application/json"
-        }
-
-        data = {"path": item_path}
-
-        response = requests.post('https://api.dropboxapi.com/2/files/delete_v2', headers=headers, json=data)
-
-        if response.status_code == 200:
-            print "Eliminado: '" + item_path + "'"
-        else:
-            print response
-            print response.content
-            raise Exception("Remove didn't return any result.")
-        pass
-
     def do_rm(self, arg):
         file_found = False
         for item in self.files:
             if item.name == arg:
                 file_found = True
                 try:
-                    self.rm(self.current_folder + arg)
+                    self.client.rm(self.current_folder + arg)
                     self.update_folder_content()
                 except:
                     print "Error al intentar eliminar el archivo."
@@ -210,43 +173,15 @@ class DropboxClient(object, Cmd):
                 return item.id
         raise Exception("El archivo indicado no existe.")
 
-    def share_file(self, file_name, mail):
-        headers = {
-            "Authorization": "Bearer " + self.token,
-            "Content-Type": "application/json"
-        }
-
-        file_id = self._get_file_id(file_name)
-
-        data = {
-            "file": file_id,
-            "members": [
-                {
-                    ".tag": "email",
-                    "email": mail
-                }
-            ],
-            "access_level": "viewer",
-        }
-
-        response = requests.post('https://api.dropboxapi.com/2/sharing/add_file_member', headers=headers, json=data)
-
-        if response.status_code == 200:
-            print "Compartido: '" + self.current_folder + file_name + "'"
-        else:
-            print response
-            print response.content
-            raise Exception("Error while sharing file.")
-        pass
-
     def do_share(self, arg):
         file_found = False
         for item in self.files:
             if item.name == arg and item.is_file():
                 file_found = True
                 try:
-                    mail = raw_input("Share with: ")
-                    self.share_file(arg, mail)
+                    mail = raw_input("Compartir con: ")
+                    file_id = self._get_file_id(arg)
+                    self.client.share_file(arg, file_id, mail)
                 except:
                     print "Error al intentar compartir el archivo."
                 break
@@ -259,37 +194,6 @@ class DropboxClient(object, Cmd):
     def complete_share(self, text, line, begidx, endidx):
         return self._get_file_completions(text)
 
-    def download_file(self, file_path):
-        headers = {
-            "Authorization": "Bearer " + self.token,
-            "Dropbox-API-Arg": '{"path": ' + '"' + file_path + '"' + '}'
-        }
-
-        response = requests.post('https://content.dropboxapi.com/2/files/download', headers=headers)
-
-        if response.status_code == 200:
-            filename = file_path.split('/')[-1]
-            open(filename, 'wb').write(response.content)
-            print "Descargado: '" + filename + "'"
-        else:
-            raise Exception("Download didn't return any result.")
-
-    def download_folder(self, file_path):
-        headers = {
-            "Authorization": "Bearer " + self.token,
-            "Dropbox-API-Arg": self._format_json([("path", file_path)])
-        }
-
-        response = requests.post('https://content.dropboxapi.com/2/files/download_zip', headers=headers)
-
-        if response.status_code == 200:
-            filename = file_path.split('/')[-1]
-            filename += ".zip"
-            open(filename, 'wb').write(response.content)
-            print "Descargado: '" + filename + "'"
-        else:
-            raise Exception("Download didn't return any result.")
-
     def do_download(self, arg):
         file_found = False
         for item in self.files:
@@ -297,9 +201,9 @@ class DropboxClient(object, Cmd):
                 file_found = True
                 try:
                     if item.is_folder():
-                        self.download_folder(self.current_folder + arg)
+                        self.client.download_folder(self.current_folder + arg)
                     else:
-                        self.download_file(self.current_folder + arg)
+                        self.client.download_file(self.current_folder + arg)
                 except:
                     print "Error al intentar descargar el archivo."
                 break
@@ -312,52 +216,12 @@ class DropboxClient(object, Cmd):
     def complete_download(self, text, line, begidx, endidx):
         return self._get_completions(text)
 
-    def _format_json_key(self, key, value):
-        if value.lower() not in ["true", "false"]:
-            return '"%s": "%s"' % (key, value)
-        else:
-            return '"%s": %s' % (key, value)
-
-
-    def _format_json(self, the_list):
-        result = "{"
-        index = 0
-        size = len(the_list)
-        while index < size:
-            result += self._format_json_key(the_list[index][0], the_list[index][1])
-            if index != size - 1:
-                result += ", "
-            index += 1
-        result += "}"
-        return result
-
-    def upload(self, file_path):
-        headers = {
-            "Authorization": "Bearer " + self.token,
-            "Dropbox-API-Arg": self._format_json([("path", self.current_folder + file_path), ("mode", "add"), ("autorename", "true"), ("mute", "false")]),
-            "Content-Type": "application/octet-stream"
-        }
-
-        # - -data - binary @ local_file.txt
-        the_file = open(file_path, 'rb')
-        files = {'file': the_file}
-        try:
-            response = requests.post('https://content.dropboxapi.com/2/files/upload', headers=headers, files=files)
-        finally:
-            the_file.close()
-
-        if response.status_code == 200:
-            print "Subido: '" + file_path + "'"
-        else:
-            raise Exception("Error during download.")
-        pass
-
     def do_upload(self, arg):
         mypath = os.getcwd()
         if arg not in [f for f in listdir(mypath) if isfile(join(mypath, f))]:
             print "Archivo '" + arg + "' no encontrado en la carpeta '" + mypath + "'."
         else:
-            self.upload(arg)
+            self.client.upload(arg, self.current_folder)
             self.update_folder_content()
 
     def help_upload(self):

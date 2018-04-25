@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
+"""Este modulo se encarga de gestionar los metadatos."""
 
 
 class File(object):
-    """Representa un archivo o carpeta de dropbox."""
-    def __init__(self, id, type, name, path_display, path_lower):
-        self.id = id
-        self.type = type
+    """Representa un archivo o una carpeta de dropbox."""
+    def __init__(self, the_id, the_type, name, path_display, path_lower):
+        self.id = the_id
+        self.type = the_type
         self.name = name
         self.path_display = path_display
         self.path_lower = path_lower
@@ -25,5 +26,5 @@ class File(object):
         return self.type == "folder"
 
     def get_full_path(self):
+        """Devuelve la ruta del archivo."""
         return self.path_display
-

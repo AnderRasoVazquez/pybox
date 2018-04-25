@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 
 class File(object):
     """Representa un archivo o carpeta de dropbox."""

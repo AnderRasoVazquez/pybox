@@ -6,13 +6,12 @@
     # TODO si existe leer el token
     # TODO (maybe) multiplatform
 
-from .command_line import CmdInterpreter
+from .parser import Parser
 
 
 def main():
     """Funcion principal."""
-    client = CmdInterpreter()
-    client.cmdloop()
+    Parser().parse_args()
 
 
 if __name__ == '__main__':

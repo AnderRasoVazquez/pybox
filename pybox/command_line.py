@@ -49,9 +49,8 @@ class CmdInterpreter(object, Cmd):
     """Cliente para comunicarse con Dropbox."""
 
     def __init__(self):
-        # TODO conseguir el token
         Cmd.__init__(self)
-        self.client = DropboxClient("4PUJzfSzG6AAAAAAAAABnBKIkgGOIkS88n9OP9TnJGLMtR0R4Xl3mYrHvI1FWqaD")
+        self.client = DropboxClient()
         self.files = []
         self.folder = "/"
         self._construct_tree(self.client.get_tree(self.folder))
@@ -204,7 +203,7 @@ class CmdInterpreter(object, Cmd):
             try:
                 mail = raw_input("Compartir con: ")
                 file_id = self._get_file_id(arg)
-                self.client.share_file(arg, file_id, mail)
+                self.client.share_file_by_id(arg, file_id, mail)
             except:
                 print "Error al intentar compartir el archivo."
         else:

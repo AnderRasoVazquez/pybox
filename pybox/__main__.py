@@ -5,17 +5,11 @@
     # TODO si existe leer el token
     # TODO (maybe) multiplatform
 
-# TODO argparse para elegir si descargar compartir o lo que sea
-
-# TODO subir un archivo
-# TODO descargar un archivo
-# TODO borrar un archivo
-# TODO compartir un archivo
-
 from .client import DropboxClient
 
 
 def main():
+    """Funcion principal."""
     client = DropboxClient()
     client.cmdloop()
 

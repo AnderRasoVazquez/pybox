@@ -1,11 +1,6 @@
 # -*- coding: utf-8 -*-
 """Este modulo se encarga de lanzar el programa."""
 
-# TODO ver si existe el token (configparser)
-    # TODO si no existe coger y guardar el token
-    # TODO si existe leer el token
-    # TODO (maybe) multiplatform
-
 from .parser import Parser
 
 

@@ -50,14 +50,15 @@ class TokenManager(object):
         print request
 
         http_response = """\
-        HTTP/1.1 200 OK
-        <html>
-        <head><title>Prueba </title></head>
-        <body>
-        The authentication flow has completed. Close this window.
-        </body>
-        </html>
-        """
+HTTP/1.1 200 OK
+
+<html>
+<head><title>Prueba </title></head>
+<body>
+The authentication flow has completed. Close this window.
+</body>
+</html>
+"""
         client_connection.sendall(http_response)
         client_connection.close()
 

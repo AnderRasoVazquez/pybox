@@ -15,6 +15,19 @@ class DropboxClient(object):
         self.token_manager = TokenManager()
         self.token = self.token_manager.token
 
+    def handle_error(self, response, error_text):
+        """Gestiona los errores."""
+        # 400 malformed token
+        # 401 invalid access token
+        if response.status_code in [400, 401]:
+            print "El token actual no es valido, obteniendo otro..."
+            self.token_manager.update_token()
+            print "Intenta ejecutar el comando de nuevo."
+        else:
+            print response
+            print response.content
+            raise Exception(error_text)
+
     def get_tree(self, folder=""):
         """Devuelve un diccionario con los contenidos de la carpeta."""
         if folder == "/":
@@ -32,9 +45,7 @@ class DropboxClient(object):
         if response.status_code == 200:
             return json.loads(response.content)
         else:
-            print response
-            print response.content
-            raise Exception("Folder name didn't return any result.")
+            self.handle_error(response, "Folder name didn't return any result.")
 
     def rm(self, item_path):
         """Elimina un archivo o una carpeta."""
@@ -50,10 +61,7 @@ class DropboxClient(object):
         if response.status_code == 200:
             print "Eliminado: '" + item_path + "'"
         else:
-            print response
-            print response.content
-            raise Exception("Remove didn't return any result.")
-        pass
+            self.handle_error(response, "Remove didn't return any result.")
 
     def share_file_by_id(self, file_name, file_id, mail):
         """Comparte un archivo."""
@@ -78,10 +86,7 @@ class DropboxClient(object):
         if response.status_code == 200:
             print "Compartido: '" + file_name + "' con '" + mail + "'."
         else:
-            print response
-            print response.content
-            raise Exception("Error while sharing file.")
-        pass
+            self.handle_error(response, "Error while sharing file.")
 
     def share_file_by_path(self, file_path, mail):
         """Dada la ruta del archivo lo comparte al mail indicado."""
@@ -105,9 +110,7 @@ class DropboxClient(object):
         if response.status_code == 200:
             return json.loads(response.content)["id"]
         else:
-            print response
-            print response.content
-            raise Exception("Error while sharing file.")
+            self.handle_error(response, "Error while getting file metadata.")
 
     def download_file(self, file_path, destination=None):
         """Descarga un archivo."""
@@ -130,9 +133,7 @@ class DropboxClient(object):
                 open(destination, 'wb').write(response.content)
                 print "Descargado: '" + filename + "' en " + "'" + destination + "'"
         else:
-            print response
-            print response.content
-            raise Exception("Download didn't return any result.")
+            self.handle_error(response, "Download didn't return any result.")
 
     def download_folder(self, file_path):
         """Descarga una carpeta."""
@@ -149,9 +150,7 @@ class DropboxClient(object):
             open(filename, 'wb').write(response.content)
             print "Descargado: '" + filename + "'"
         else:
-            print response
-            print response.content
-            raise Exception("Download didn't return any result.")
+            self.handle_error(response, "Download didn't return any result.")
 
     def upload(self, file_path, destination_folder):
         """Sube un archivo."""
@@ -164,15 +163,11 @@ class DropboxClient(object):
 
         the_file = open(file_path, 'rb')
         files = {'file': the_file}
-        try:
-            response = requests.post('https://content.dropboxapi.com/2/files/upload', headers=headers, files=files)
-        finally:
-            the_file.close()
+
+        response = requests.post('https://content.dropboxapi.com/2/files/upload', headers=headers, files=files)
+        the_file.close()
 
         if response.status_code == 200:
             print "Subido: '" + file_path + "'"
         else:
-            print response
-            print response.content
-            raise Exception("Error during download.")
-        pass
+            self.handle_error(response, "Error during upload.")

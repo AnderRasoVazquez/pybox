@@ -13,7 +13,7 @@ import os.path
 class TokenManager(object):
     """Esta clase se encarga de descargar, guardar o mostrar el token."""
     def __init__(self):
-        self.port = 8586
+        self.port = 8080
         self.token_path = os.path.dirname(os.path.abspath(__file__)) + '/data/token'
         self.client_id = "7veypz9j473hv46"
         self.client_secret = '8frtxz74m0ur5uc'
@@ -100,10 +100,14 @@ class TokenManager(object):
         if saved_token:
             return saved_token
         else:
-            code = self._get_code()
-            token = self._obtain_token(code)
-            self._save_token(token)
-            return token
+            return self.update_token()
+
+    def update_token(self):
+        """Obtiene el token y lo actualiza."""
+        code = self._get_code()
+        token = self._obtain_token(code)
+        self._save_token(token)
+        return token
 
     def _read_token(self):
         """Lee el token guardado."""
